@@ -2,30 +2,131 @@
 title: "Practical Machine Learning Course Project"
 author: "Uday Hari Narayanan"
 date: "10/05/2020"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
-Default Rmd file for practical machine learning course at coursera.
+## Human Activity Recognition - Weight Lifting Exercises Dataset
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+## Introduction
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+Devices like Fitbit and Nike FuelBand can collect large amount of personal activity data. Usually, people quantify how much of an activity they do but not how well they do it. The dataset includes data from six young health participants who were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions. 
+The WLE dataset was obtained from [HAR Project.](http://groupware.les.inf.puc-rio.br/har)
+Reference to paper: Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013. 
 
-```{r cars}
-summary(cars)
+## Data
+
+
+The training data for this project was obtained from [here.](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv)
+
+
+The test data for this project was obtained from [here.](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv)
+
+## Exploring the Dataset
+
+We read the training dataset first to build our model.
+```{r train}
+set.seed(95014)
+pml_train <- read.csv("pml-training.csv", sep = ',')
+```
+The dimensions of the training dataset is given below:
+```{r dimTrain}
+dim(pml_train)
+```
+Similarly, we read the test dataset and display its dimensions:
+```{r Test}
+pml_test <- read.csv("pml-testing.csv", sep = ',')
+dim(pml_test)
+```
+## Using parallel and doParallel Packages to Improve Performance
+
+As suggested by course mentor Leonard Greski [here](https://github.com/lgreski/datasciencectacontent/blob/master/markdown/pml-randomForestPerformance.md), to improve performance of Random Forest in caret::train(), one may use parallel processing using parallel and doParallel packages
+```{r parallelprocess, warning=FALSE, message=FALSE, echo=TRUE}
+library(parallel)
+library(doParallel)
+cluster <- makeCluster(detectCores() - 1)
+registerDoParallel(cluster)
+```
+# Splitting of the training data
+The training data is split further into:
+  - train data which consists of 75% of the training dataset. We create our model in this dataset.
+  - test data which consists of the remaining 25% of the training dataset. We test our model for accuracy here.
+For this we also call the caret package.
+
+```{r Split, warning=FALSE, message=FALSE, echo=TRUE}
+library(caret)
+inTraining <- createDataPartition(pml_train$classe, p = .75, list=FALSE)
+training <- pml_train[inTraining,]
+testing <- pml_train[-inTraining,]
+```
+## Removing the near zero variance predictors
+
+The dataset consists of 160 predictors. With an initial look at the dataset we see a lot of values which are either missing or have NA values. We use nearZeroVar function to identify and remove those predictors which do not impact our output significantly.
+```{r nearZeroVar, warning=FALSE, message=FALSE, echo=TRUE}
+nsv <- nearZeroVar(training,names = TRUE)
+all_cols <- names(training)
+training_small <- training[ , setdiff(all_cols, nsv)] #Removing the near zero var predictors
+testing_small <- testing[ , setdiff(all_cols, nsv)]
+```
+## Imputing Missing Values
+
+There are missing values in the output predictor 'classe' as well as under other predictors too. For imputing we use the k-Nearest Neighbour Impute function. knnImpute adds missing values by adding point values that can be approximated by the values of points closest to it. [Ref](https://towardsdatascience.com/the-use-of-knn-for-missing-values-cf33d935c637)
+```{r Imputing, warning=FALSE, message=FALSE, echo=TRUE}
+preObj <- preProcess(training_small, method = "knnImpute")
+
+classe <- predict(preObj,training_small)$classe
+training_small <- predict(preObj,training_small)
+
+classe <- predict(preObj,testing_small)$classe
+testing_small <- predict(preObj,testing_small)
+```
+# Creating our model with decision tree
+We build a model using decion tree first and look at its accuracy.
+```{r DecisionTree, warning=FALSE}
+fitControl <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+fitree <- train(classe ~ ., method="rpart", data = training_small ,trControl = fitControl)
+pred2 <- predict(fitree,testing_small)
+confusionMatrix(factor(pred2),factor(testing_small$classe))
+```
+The decion tree gives only 66.17% accuracy. We will try using Random Forest next.
+
+# Creating our model using Random Forest with PCA
+As given in the [article](https://github.com/lgreski/datasciencectacontent/blob/master/markdown/pml-randomForestPerformance.md) by Leonard Greski, we also use trainControl() function in caret. We perform the k-fold cross validation with k=5 to improve performance. We use Principal Component Analysis in pre-processing to reduce the number of predictors and reduce the noise.
+```{r RandomForest}
+fit <- train(classe ~ ., method="rf", preProcess = "pca" ,pcaComp = 17, data = training_small ,trControl = fitControl)
+```
+# Prediction and Accuracy
+
+We predict using our model on the test dataset created before. Confusion matrix gives the accuracy of model on the test data.
+```{r Predict}
+pred <- predict(fit,testing_small)
+confusionMatrix(factor(pred),factor(testing_small$classe))
+```
+Thus, here we get 98.08% accuracy using the Random Forest algorithm. We will henceforth use this Random Forest classifier model to predict the classe on the test set.
+
+Below, we use our model on the given testing dataset to predict the 'classe' on the test set. The output values were recorded for further use.
+
+
+```{r TestData}
+
+pml_test <- predict(preObj,pml_test)
+predontest <- predict(fit,pml_test)
+
 ```
 
-## Including Plots
+## De-Registering the parallel Processing Cluster
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+We shut down the cluster of performing parallel processing in R.
+```{r StopCluster}
+stopCluster(cluster)
+registerDoSEQ()
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+## End
