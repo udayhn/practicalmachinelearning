@@ -107,7 +107,7 @@ We predict using our model on the test dataset created before. Confusion matrix 
 pred <- predict(fit,testing_small)
 confusionMatrix(factor(pred),factor(testing_small$classe))
 ```
-Thus, here we get 98.08% accuracy using the Random Forest algorithm. We will henceforth use this Random Forest classifier model to predict the classe on the test set.
+Thus, here we get out of sample accuracy as 98.08% using the Random Forest algorithm. We will henceforth use this Random Forest classifier model to predict the classe on the test set. The out-of sample error is 1.92%.
 
 Below, we use our model on the given testing dataset to predict the 'classe' on the test set. The output values were recorded for further use.
 

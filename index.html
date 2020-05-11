@@ -513,7 +513,7 @@ confusionMatrix(factor(pred),factor(testing_small$classe))</code></pre>
 ## Detection Rate         0.2814   0.1892   0.1715   0.1568   0.1819
 ## Detection Prevalence   0.2838   0.1939   0.1799   0.1584   0.1839
 ## Balanced Accuracy      0.9929   0.9860   0.9867   0.9773   0.9938</code></pre>
-<p>Thus, here we get 98.08% accuracy using the Random Forest algorithm. We will henceforth use this Random Forest classifier model to predict the classe on the test set.</p>
+<p>Thus, here we get out of sample accuracy as 98.08% using the Random Forest algorithm. We will henceforth use this Random Forest classifier model to predict the classe on the test set. The out-of sample error is 1.92%.</p>
 <p>Below, we use our model on the given testing dataset to predict the ‘classe’ on the test set. The output values were recorded for further use.</p>
 <pre class="r"><code>pml_test &lt;- predict(preObj,pml_test)
 predontest &lt;- predict(fit,pml_test)</code></pre>
